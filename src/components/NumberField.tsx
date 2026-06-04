@@ -8,6 +8,8 @@ type NumberFieldProps = {
   unit?: string
   hint?: string
   slider?: boolean
+  className?: string
+  fractionDigits?: number
 }
 
 const NumberField = ({
@@ -20,24 +22,30 @@ const NumberField = ({
   unit,
   hint,
   slider = false,
+  className,
+  fractionDigits,
 }: NumberFieldProps) => {
+  const inputValue = Number.isFinite(value)
+    ? value.toFixed(fractionDigits ?? (step % 1 === 0 ? 0 : 2))
+    : '0'
+
   const handleChange = (rawValue: string) => {
     const parsed = Number(rawValue)
     onChange(Number.isFinite(parsed) ? parsed : 0)
   }
 
   return (
-    <label className="field">
+    <label className={className ? `field ${className}` : 'field'}>
       <span>
         {label}
-        {unit ? <small>{unit}</small> : null}
+        {unit ? <small className="field-unit">{unit}</small> : null}
       </span>
       <input
         type="number"
         min={min}
         max={max}
         step={step}
-        value={value}
+        value={inputValue}
         onChange={(event) => handleChange(event.target.value)}
       />
       {slider && max !== undefined ? (

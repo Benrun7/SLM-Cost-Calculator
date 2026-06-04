@@ -1,5 +1,8 @@
 import type { GeometryImport } from '../domain/types'
 
+export type TableValue = string | number | boolean | null | undefined
+export type TableRow = TableValue[]
+
 type ImportField =
   | 'partsVolumeMm3'
   | 'supportVolumeMm3'
@@ -71,7 +74,7 @@ const sliceAliases: Record<SliceField, string[]> = {
 }
 
 const normalize = (value: string) =>
-  value
+  String(value)
     .trim()
     .toLowerCase()
     .replaceAll(/\s|_|-|\(|\)|\[|\]|\.|,/g, '')
@@ -84,8 +87,16 @@ const detectDelimiter = (line: string) => {
   }, ';')
 }
 
-const parseNumber = (value: string) => {
-  const parsed = Number(value.trim().replace(/\s/g, '').replace(',', '.'))
+const parseNumber = (value: TableValue) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined
+  }
+
+  if (value === null || value === undefined) {
+    return undefined
+  }
+
+  const parsed = Number(String(value).trim().replace(/\s/g, '').replace(',', '.'))
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
@@ -114,11 +125,10 @@ const averagePositiveStep = (values: number[]) => {
 }
 
 const parseSliceDistribution = (
-  rows: string[],
-  delimiter: string,
+  rows: TableRow[],
   sourceName: string,
 ): GeometryImport | undefined => {
-  const headers = rows[0].split(delimiter).map(resolveSliceField)
+  const headers = rows[0].map((value) => resolveSliceField(String(value ?? '')))
   const heightIndex = headers.findIndex((field) => field === 'heightMm')
   const totalIndex = headers.findIndex((field) => field === 'totalSectionMm2')
   const partIndex = headers.findIndex((field) => field === 'partSectionMm2')
@@ -131,16 +141,15 @@ const parseSliceDistribution = (
   }
 
   const slices = rows.slice(1).flatMap((row) => {
-    const values = row.split(delimiter)
-    const height = parseNumber(values[heightIndex] ?? '')
-    const partSection = partIndex >= 0 ? (parseNumber(values[partIndex] ?? '') ?? 0) : 0
+    const height = parseNumber(row[heightIndex])
+    const partSection = partIndex >= 0 ? (parseNumber(row[partIndex]) ?? 0) : 0
     const supportSection = supportIndexes.reduce(
-      (sum, index) => sum + (parseNumber(values[index] ?? '') ?? 0),
+      (sum, index) => sum + (parseNumber(row[index]) ?? 0),
       0,
     )
     const totalSection =
       totalIndex >= 0
-        ? (parseNumber(values[totalIndex] ?? '') ?? partSection + supportSection)
+        ? (parseNumber(row[totalIndex]) ?? partSection + supportSection)
         : partSection + supportSection
 
     return height !== undefined && totalSection >= 0
@@ -173,25 +182,23 @@ const parseSliceDistribution = (
   }
 }
 
-export const parseMagicsCsv = (text: string, sourceName: string): GeometryImport => {
-  const rows = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
+export const parseMagicsRows = (rows: TableRow[], sourceName: string): GeometryImport => {
+  const normalizedRows = rows.filter((row) =>
+    row.some((value) => value !== null && value !== undefined && String(value).trim() !== ''),
+  )
 
-  if (rows.length < 2) {
-    throw new Error('CSV должен содержать заголовок и хотя бы одну строку данных.')
+  if (normalizedRows.length < 2) {
+    throw new Error('Файл должен содержать заголовок и хотя бы одну строку данных.')
   }
 
-  const delimiter = detectDelimiter(rows[0])
-  const sliceImport = parseSliceDistribution(rows, delimiter, sourceName)
+  const sliceImport = parseSliceDistribution(normalizedRows, sourceName)
 
   if (sliceImport) {
     return sliceImport
   }
 
-  const headers = rows[0].split(delimiter).map(resolveField)
-  const values = rows[1].split(delimiter)
+  const headers = normalizedRows[0].map((value) => resolveField(String(value ?? '')))
+  const values = normalizedRows[1]
   const imported: GeometryImport = {
     sourceName,
     sourceType: 'magics-csv',
@@ -202,7 +209,7 @@ export const parseMagicsCsv = (text: string, sourceName: string): GeometryImport
       return
     }
 
-    const parsed = parseNumber(values[index] ?? '')
+    const parsed = parseNumber(values[index])
     if (parsed !== undefined) {
       imported[field] = parsed
     }
@@ -218,4 +225,21 @@ export const parseMagicsCsv = (text: string, sourceName: string): GeometryImport
   }
 
   return imported
+}
+
+export const parseMagicsCsv = (text: string, sourceName: string): GeometryImport => {
+  const rows = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (rows.length < 2) {
+    throw new Error('CSV должен содержать заголовок и хотя бы одну строку данных.')
+  }
+
+  const delimiter = detectDelimiter(rows[0])
+  return parseMagicsRows(
+    rows.map((row) => row.split(delimiter)),
+    sourceName,
+  )
 }

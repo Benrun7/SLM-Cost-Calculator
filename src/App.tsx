@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import './App.css'
 import FileImport from './components/FileImport'
 import NumberField from './components/NumberField'
+import ReportPanel from './components/ReportPanel'
 import ResultsPanel from './components/ResultsPanel'
 import {
   chamberPresets,
@@ -13,13 +14,22 @@ import {
   materialPresets,
 } from './data/presets'
 import { calculateSlmCost } from './domain/calculations'
-import type { GeometryImport, GeometryInput, LaborInput, MaterialInput, PrintInput } from './domain/types'
+import type {
+  GeometryImport,
+  GeometryInput,
+  LaborInput,
+  MaterialInput,
+  PrintInput,
+} from './domain/types'
+import type { StlMeshPreview } from './parsers/stl'
 
 function App() {
   const [geometry, setGeometry] = useState<GeometryInput>(defaultGeometryInput)
   const [print, setPrint] = useState<PrintInput>(defaultPrintInput)
   const [material, setMaterial] = useState<MaterialInput>(defaultMaterialInput)
   const [labor, setLabor] = useState<LaborInput>(defaultLaborInput)
+  const [meshPreview, setMeshPreview] = useState<StlMeshPreview | null>(null)
+  const [isReportOpen, setIsReportOpen] = useState(false)
   const [status, setStatus] = useState('Файл компоновки пока не загружен.')
 
   const result = useMemo(
@@ -35,6 +45,9 @@ function App() {
   )
 
   const selectedChamber = chamberPresets.find((chamber) => chamber.id === print.chamberId)
+  const selectedMaterial = materialPresets.find((item) => item.id === material.materialId)
+  const layerHeightMicrons = Math.round(print.layerHeightMm * 1000)
+  const hatchSpacingMicrons = Math.round(print.hatchSpacingMm * 1000)
 
   const updateGeometry = (patch: Partial<GeometryInput>) =>
     setGeometry((current) => ({ ...current, ...patch }))
@@ -75,11 +88,12 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="hero">
-        <p>SLM Cost Calculator</p>
-        <h1>Калькулятор запуска SLM</h1>
-        <span>Импорт STL/CSV, оценка себестоимости</span>
-        <div className="hero-visual" aria-hidden="true"></div>
+      <header className="page-head">
+        <div>
+          <p>SLM Cost Calculator</p>
+          <h1>Калькулятор запуска SLM</h1>
+        </div>
+        <span>Импорт геометрии, параметры печати и смета запуска в одном экране</span>
       </header>
 
       <div className="workspace">
@@ -89,32 +103,40 @@ function App() {
               <h2>Компоновка</h2>
               <span>{geometry.sourceName}</span>
             </div>
-            <FileImport onImport={applyGeometryImport} onStatus={setStatus} />
+            <FileImport
+              onImport={applyGeometryImport}
+              onStatus={setStatus}
+              onMeshPreview={setMeshPreview}
+            />
             <p className="status">{status}</p>
 
-            <div className="form-grid">
+            <div className="form-grid geometry-grid">
               <NumberField
                 label="Объём деталей"
-                unit="мм3"
+                unit="мм³"
                 value={geometry.partsVolumeMm3}
                 onChange={(value) => updateGeometry({ partsVolumeMm3: value })}
                 step={1000}
+                className="field--primary"
+                fractionDigits={2}
               />
               <NumberField
                 label="Объём поддержек"
-                unit="мм3"
+                unit="мм³"
                 value={geometry.supportVolumeMm3}
                 onChange={(value) => updateGeometry({ supportVolumeMm3: value })}
-                hint="Можно вводить вручную без тяжёлого STL"
                 step={1000}
+                className="field--primary"
+                fractionDigits={2}
               />
               <NumberField
                 label="Среднее сечение деталей и поддержек"
-                unit="мм2"
+                unit="мм²"
                 value={geometry.meanSectionMm2}
                 onChange={(value) => updateGeometry({ meanSectionMm2: value })}
                 hint="0 значит V деталей + поддержек / H"
                 step={10}
+                fractionDigits={2}
               />
               <NumberField
                 label="Время слоя из Magics"
@@ -123,6 +145,7 @@ function App() {
                 onChange={(value) => updateGeometry({ estimatedLayerTimeSec: value })}
                 hint="0 значит считать по скоростям"
                 step={0.1}
+                fractionDigits={2}
               />
             </div>
           </section>
@@ -133,18 +156,29 @@ function App() {
               <span>{selectedChamber?.name}</span>
             </div>
             <div className="form-grid">
-              <label className="field">
-                <span>Камера принтера</span>
-                <select
-                  value={print.chamberId}
-                  onChange={(event) => updatePrint({ chamberId: event.target.value })}
-                >
-                  {chamberPresets.map((chamber) => (
-                    <option key={chamber.id} value={chamber.id}>
-                      {chamber.name}, H до {chamber.maxHeightMm} мм
-                    </option>
-                  ))}
-                </select>
+              <label className="field chamber-field">
+                <span>
+                  Камера принтера
+                  <small className="field-unit">мм</small>
+                </span>
+                <div className="select-shell">
+                  <select
+                    value={print.chamberId}
+                    onChange={(event) => updatePrint({ chamberId: event.target.value })}
+                  >
+                    {chamberPresets.map((chamber) => (
+                      <option key={chamber.id} value={chamber.id}>
+                        {chamber.name} · H до {chamber.maxHeightMm}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {selectedChamber ? (
+                  <em>
+                    Рабочая зона {selectedChamber.widthMm} × {selectedChamber.depthMm} ×{' '}
+                    {selectedChamber.maxHeightMm} мм
+                  </em>
+                ) : null}
               </label>
               <NumberField
                 label="Высота запуска"
@@ -152,17 +186,18 @@ function App() {
                 value={print.buildHeightMm}
                 onChange={(value) => updatePrint({ buildHeightMm: value })}
                 max={selectedChamber?.maxHeightMm ?? 500}
-                step={1}
+                step={0.01}
                 slider
+                fractionDigits={2}
               />
               <NumberField
                 label="Высота слоя"
-                unit="мм"
-                value={print.layerHeightMm}
-                onChange={(value) => updatePrint({ layerHeightMm: value })}
-                min={0.02}
-                max={0.1}
-                step={0.01}
+                unit="мкм"
+                value={layerHeightMicrons}
+                onChange={(value) => updatePrint({ layerHeightMm: value / 1000 })}
+                min={20}
+                max={100}
+                step={10}
                 slider
               />
               <NumberField
@@ -185,12 +220,12 @@ function App() {
               />
               <NumberField
                 label="Шаг штриховки"
-                unit="мм"
-                value={print.hatchSpacingMm}
-                onChange={(value) => updatePrint({ hatchSpacingMm: value })}
-                min={0.05}
-                max={0.2}
-                step={0.01}
+                unit="мкм"
+                value={hatchSpacingMicrons}
+                onChange={(value) => updatePrint({ hatchSpacingMm: value / 1000 })}
+                min={50}
+                max={200}
+                step={10}
                 hint="Используется для авторасчёта количества треков"
                 slider
               />
@@ -236,7 +271,7 @@ function App() {
               </label>
               <NumberField
                 label="Насыпная плотность"
-                unit="г/см3"
+                unit="г/см³"
                 value={material.bulkDensityGcm3}
                 onChange={(value) =>
                   setMaterial((current) => ({ ...current, bulkDensityGcm3: value }))
@@ -248,7 +283,7 @@ function App() {
               />
               <NumberField
                 label="Плотность детали"
-                unit="г/см3"
+                unit="г/см³"
                 value={material.solidDensityGcm3}
                 onChange={(value) =>
                   setMaterial((current) => ({ ...current, solidDensityGcm3: value }))
@@ -382,8 +417,21 @@ function App() {
           </section>
         </section>
 
-        <ResultsPanel result={result} />
+        <ResultsPanel result={result} onOpenReport={() => setIsReportOpen(true)} />
       </div>
+
+      <ReportPanel
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        geometry={geometry}
+        print={print}
+        material={material}
+        labor={labor}
+        result={result}
+        materialName={selectedMaterial?.name ?? material.materialId}
+        chamber={selectedChamber}
+        mesh={meshPreview}
+      />
     </main>
   )
 }

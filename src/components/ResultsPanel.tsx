@@ -2,6 +2,7 @@ import type { CalculationResult } from '../domain/types'
 
 type ResultsPanelProps = {
   result: CalculationResult
+  onOpenReport: () => void
 }
 
 const formatNumber = (value: number, maximumFractionDigits = 2) =>
@@ -14,125 +15,124 @@ const formatRub = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value)
 
-const ResultCard = ({
-  label,
-  value,
-  note,
-}: {
-  label: string
-  value: string
-  note?: string
-}) => (
-  <article className="result-card">
-    <span>{label}</span>
-    <strong>{value}</strong>
-    {note ? <small>{note}</small> : null}
-  </article>
-)
+const ResultsPanel = ({ result, onOpenReport }: ResultsPanelProps) => {
+  const summaryItems = [
+    {
+      label: 'Печать',
+      value: `${formatNumber(result.printTimeHours, 1)} ч`,
+      note: `${formatNumber(result.layerTimeSec, 1)} сек/слой`,
+    },
+    {
+      label: 'Проект',
+      value: `${formatNumber(result.totalProjectHours, 1)} ч`,
+      note: `${result.workShifts8h} смен по 8 часов`,
+    },
+    {
+      label: 'Порошок',
+      value: `${formatNumber(result.chargeablePowderMassKg, 3)} кг`,
+      note: 'к списанию',
+    },
+    {
+      label: 'Детали',
+      value: `${formatNumber(result.partsMassKg, 3)} кг`,
+      note: `${formatNumber(result.supportMassKg, 3)} кг поддержек`,
+    },
+  ]
 
-const ResultsPanel = ({ result }: ResultsPanelProps) => (
-  <aside className="results-panel">
-    <div className="panel-heading">
-      <span>Итог</span>
-      <strong>{formatRub(result.totalCostRub)}</strong>
-    </div>
+  const costRows = [
+    { label: 'Порошок', value: result.powderCostRub },
+    { label: 'ФОТ', value: result.laborCostRub },
+    { label: 'Расходники', value: result.consumablesCostRub },
+    { label: 'Инертный газ', value: result.gasCostRub },
+    { label: 'Ресурс фильтра', value: result.filterCostRub },
+    { label: 'Обработка платформы', value: result.platformProcessingRub },
+  ]
+  const costShareTotal = Math.max(result.totalCostRub, 1)
 
-    <div className="result-grid">
-      <ResultCard
-        label="Затраты порошка"
-        value={formatRub(result.powderCostRub)}
-        note={`${formatNumber(result.chargeablePowderMassKg, 3)} кг к списанию`}
-      />
-      <ResultCard
-        label="Масса деталей"
-        value={`${formatNumber(result.partsMassKg, 3)} кг`}
-        note={`${formatNumber(result.fusedVolumeCm3, 1)} см3 вместе с поддержками`}
-      />
-      <ResultCard
-        label="Масса поддержек"
-        value={`${formatNumber(result.supportMassKg, 3)} кг`}
-        note={`${formatNumber(result.supportVolumeCm3, 1)} см3 поддержек`}
-      />
-      <ResultCard label="Инертный газ" value={formatRub(result.gasCostRub)} />
-      <ResultCard label="Ресурс фильтра" value={formatRub(result.filterCostRub)} />
-      <ResultCard label="ФОТ" value={formatRub(result.laborCostRub)} />
-      <ResultCard label="Расходники" value={formatRub(result.consumablesCostRub)} />
-      <ResultCard
-        label="Время печати"
-        value={`${formatNumber(result.printTimeHours, 1)} ч`}
-        note={`${formatNumber(result.layerTimeSec, 1)} сек/слой`}
-      />
-      <ResultCard
-        label="Срок проекта"
-        value={`${formatNumber(result.totalProjectHours, 1)} ч`}
-        note={`${result.workShifts8h} смен по 8 часов`}
-      />
-    </div>
+  const detailRows = [
+    ['Слоёв', formatNumber(result.layerCount, 0)],
+    ['Периметр слоя', `${formatNumber(result.approximatePerimeterMm)} мм`],
+    ['Треков', formatNumber(result.trackCount, 0)],
+    ['Длина штриховки слоя', `${formatNumber(result.hatchLengthMm, 0)} мм`],
+    ['Штриховка', `${formatNumber(result.hatchTimeSec)} сек`],
+    ['Контуры', `${formatNumber(result.contourTimeSec)} сек`],
+    ['Сплавленный металл', `${formatNumber(result.fusedMassKg, 3)} кг`],
+    ['Резерв порошка', `${formatNumber(result.powderReserveKg, 3)} кг`],
+    ['Порошок в камере', `${formatNumber(result.requiredPowderMassKg, 3)} кг`],
+    ['Несплавленный порошок', `${formatNumber(result.unfusedPowderMassKg, 3)} кг`],
+    ['Рабочий объём засыпки', `${formatNumber(result.buildVolumeCm3, 1)} см3`],
+    ['Трудозатраты', `${formatNumber(result.laborHours, 1)} ч`],
+  ]
 
-    <dl className="details">
-      <div>
-        <dt>Количество слоёв</dt>
-        <dd>{formatNumber(result.layerCount, 0)}</dd>
+  return (
+    <aside className="results-panel">
+      <div className="panel-heading">
+        <span>Общая себестоимость запуска</span>
+        <strong>{formatRub(result.totalCostRub)}</strong>
+        <button className="report-open-button" type="button" onClick={onOpenReport}>
+          Отчёт
+        </button>
       </div>
-      <div>
-        <dt>Приблизительный периметр слоя</dt>
-        <dd>{formatNumber(result.approximatePerimeterMm)} мм</dd>
-      </div>
-      <div>
-        <dt>Расчётное количество треков</dt>
-        <dd>{formatNumber(result.trackCount, 0)}</dd>
-      </div>
-      <div>
-        <dt>Длина штриховки слоя</dt>
-        <dd>{formatNumber(result.hatchLengthMm, 0)} мм</dd>
-      </div>
-      <div>
-        <dt>Штриховка слоя</dt>
-        <dd>{formatNumber(result.hatchTimeSec)} сек</dd>
-      </div>
-      <div>
-        <dt>Контуры слоя</dt>
-        <dd>{formatNumber(result.contourTimeSec)} сек</dd>
-      </div>
-      <div>
-        <dt>Сплавленный металл</dt>
-        <dd>{formatNumber(result.fusedMassKg, 3)} кг</dd>
-      </div>
-      <div>
-        <dt>Резерв порошка к списанию</dt>
-        <dd>{formatNumber(result.powderReserveKg, 3)} кг</dd>
-      </div>
-      <div>
-        <dt>Требуется порошка в камере</dt>
-        <dd>{formatNumber(result.requiredPowderMassKg, 3)} кг</dd>
-      </div>
-      <div>
-        <dt>Несплавленный порошок</dt>
-        <dd>{formatNumber(result.unfusedPowderMassKg, 3)} кг</dd>
-      </div>
-      <div>
-        <dt>Рабочий объём засыпки</dt>
-        <dd>{formatNumber(result.buildVolumeCm3, 1)} см3</dd>
-      </div>
-      <div>
-        <dt>Трудозатраты</dt>
-        <dd>{formatNumber(result.laborHours, 1)} ч</dd>
-      </div>
-      <div>
-        <dt>Обработка платформы</dt>
-        <dd>{formatRub(result.platformProcessingRub)}</dd>
-      </div>
-    </dl>
 
-    {result.warnings.length > 0 ? (
-      <div className="warnings">
-        <strong>Важно</strong>
-        {result.warnings.map((warning) => (
-          <p key={warning}>{warning}</p>
+      <div className="summary-strip">
+        {summaryItems.map((item) => (
+          <article className="summary-item" key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <small>{item.note}</small>
+          </article>
         ))}
       </div>
-    ) : null}
-  </aside>
-)
+
+      <section className="result-section">
+        <div className="result-section-heading">
+          <h3>Разбивка стоимости</h3>
+          <span>доля в итоге</span>
+        </div>
+        <div className="cost-breakdown">
+          {costRows.map((row) => (
+            <article className="cost-row" key={row.label}>
+              <div>
+                <span>{row.label}</span>
+                <strong>{formatRub(row.value)}</strong>
+              </div>
+              <div className="cost-bar" aria-hidden="true">
+                <span
+                  style={{
+                    width: `${Math.max((row.value / costShareTotal) * 100, 2)}%`,
+                  }}
+                />
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <details className="result-section tech-details">
+        <summary>
+          <span>Технологические данные</span>
+          <strong>Показать</strong>
+        </summary>
+        <dl className="result-list">
+          {detailRows.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
+
+      {result.warnings.length > 0 ? (
+        <div className="warnings">
+          <strong>Важно</strong>
+          {result.warnings.map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
+    </aside>
+  )
+}
 
 export default ResultsPanel

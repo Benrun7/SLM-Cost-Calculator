@@ -2,7 +2,7 @@
   --text: #536179;
   --text-h: #111827;
   --muted: #8b98ad;
-  --bg: #dfeaff;
+  --bg: #f3f7fc;
   --surface: #ffffff;
   --surface-soft: rgba(255, 255, 255, 0.72);
   --card-bg: linear-gradient(145deg, #ffffff, #f6f9ff);
@@ -40,11 +40,7 @@
 body {
   margin: 0;
   min-width: 320px;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.95), transparent 24%),
-    radial-gradient(circle at 78% 4%, rgba(192, 213, 255, 0.95), transparent 28%),
-    linear-gradient(135deg, #edf4ff 0%, #d7e7ff 45%, #cfe2ff 100%);
-  background-attachment: fixed;
+  background: linear-gradient(180deg, #f7fbff 0%, var(--bg) 100%);
 }
 
 h1,
@@ -55,7 +51,7 @@ h2 {
 }
 
 h1 {
-  font-size: clamp(32px, 5vw, 58px);
+  font-size: clamp(30px, 4vw, 46px);
   line-height: 1;
   letter-spacing: -0.05em;
 

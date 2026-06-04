@@ -11,8 +11,8 @@ import type {
 export const materialPresets: MaterialPreset[] = [
   {
     id: 'pc-300',
-    name: 'PC-300',
-    bulkDensityGcm3: 1.2,
+    name: 'РС-300',
+    bulkDensityGcm3: 1.4,
     solidDensityGcm3: 2.7,
     powderCostRubKg: 3000,
   },
@@ -35,21 +35,21 @@ export const materialPresets: MaterialPreset[] = [
 export const chamberPresets: ChamberPreset[] = [
   {
     id: 'ls-m350',
-    name: 'Лазерные Системы М350, 350 x 350 x 390 мм',
+    name: 'Лазерные Системы М350',
     widthMm: 350,
     depthMm: 350,
     maxHeightMm: 390,
   },
   {
     id: 'small-250',
-    name: '250 x 250 мм',
+    name: 'Камера 250 x 250',
     widthMm: 250,
     depthMm: 250,
     maxHeightMm: 300,
   },
   {
     id: 'large-400',
-    name: '400 x 400 мм',
+    name: 'Камера 400 x 400',
     widthMm: 400,
     depthMm: 400,
     maxHeightMm: 400,
@@ -101,8 +101,8 @@ export const defaultLaborInput: LaborInput = {
   engineerRateRubHour: 1500,
   unpackingHours: 1.5,
   heatTreatmentHours: 2,
-  edmHours: 1,
-  roughMachiningHours: 0,
-  fineMachiningHours: 0,
-  finishMachiningHours: 0,
+  edmHours: 2,
+  roughMachiningHours: 2,
+  fineMachiningHours: 4,
+  finishMachiningHours: 2,
 }
